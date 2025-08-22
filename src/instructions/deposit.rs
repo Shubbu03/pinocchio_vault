@@ -32,7 +32,7 @@ impl<'a> TryFrom<&'a [AccountInfo]> for DepositAccounts<'a> {
         };
 
         // c. vault should not have any prev amount, it should be zero as its initialised here
-        if !vault.lamports().ne(&0) {
+        if vault.lamports() != 0 {
             return Err(ProgramError::InvalidAccountData);
         };
 
@@ -61,6 +61,7 @@ impl<'a> TryFrom<&'a [u8]> for DepositInstructions {
             return Err(ProgramError::InvalidInstructionData);
         }
 
+        //deserialising raw bytes(byte array) to meaningful data
         let amount = u64::from_le_bytes(data.try_into().unwrap());
 
         // the amount deposited by user should not be 0
