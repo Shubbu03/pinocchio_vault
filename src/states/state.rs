@@ -1,4 +1,4 @@
-use super::utils::{load_acc_mut_unchecked, DataLen};
+use super::utils::DataLen;
 use pinocchio::{
     account_info::AccountInfo,
     program_error::ProgramError,
@@ -6,20 +6,21 @@ use pinocchio::{
     ProgramResult,
 };
 
-use crate::{errors::MyProgramError, instructions::Initialize};
+use crate::errors::MyProgramError;
+use crate::states::utils::load_acc_mut_unchecked;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct MyState {
+pub struct VaultState {
     pub owner: Pubkey,
 }
 
-impl DataLen for MyState {
-    const LEN: usize = core::mem::size_of::<MyState>();
+impl DataLen for VaultState {
+    const LEN: usize = core::mem::size_of::<VaultState>();
 }
 
-impl MyState {
-    pub const SEED: &'static str = "init";
+impl VaultState {
+    pub const SEED: &'static str = "vault";
 
     pub fn validate_pda(bump: u8, pda: &Pubkey, owner: &Pubkey) -> Result<(), ProgramError> {
         let seed_with_bump = &[Self::SEED.as_bytes(), owner, &[bump]];
@@ -30,11 +31,12 @@ impl MyState {
         Ok(())
     }
 
-    pub fn initialize(my_stata_acc: &AccountInfo, ix_data: &Initialize) -> ProgramResult {
-        let my_state =
-            unsafe { load_acc_mut_unchecked::<MyState>(my_stata_acc.borrow_mut_data_unchecked()) }?;
+    pub fn initialize(vault_acc: &AccountInfo, owner: &Pubkey) -> ProgramResult {
+        let vault_state =
+            unsafe { load_acc_mut_unchecked::<VaultState>(vault_acc.borrow_mut_data_unchecked())? };
 
-        my_state.owner = ix_data.owner;
+        vault_state.owner = *owner;
+
         Ok(())
     }
 }
