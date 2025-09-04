@@ -9,7 +9,7 @@ extern crate alloc;
 use alloc::vec;
 
 use pinocchio_vault::instructions::Initialize;
-use pinocchio_vault::states::{to_bytes, MyState};
+use pinocchio_vault::states::{to_bytes, VaultState};
 use solana_sdk::rent::Rent;
 use solana_sdk::sysvar::Sysvar;
 
@@ -32,19 +32,19 @@ pub fn get_rent_data() -> Vec<u8> {
 }
 
 #[test]
-fn test_initialize_mystate() {
+fn test_initialize_VaultState() {
     let mollusk = mollusk();
 
     //system program and system account
     let (system_program, system_account) = program::keyed_account_for_system_program();
 
     // Create the PDA
-    let (mystate_pda, bump) =
-        Pubkey::find_program_address(&[MyState::SEED.as_bytes(), &PAYER.to_bytes()], &PROGRAM);
+    let (VaultState_pda, bump) =
+        Pubkey::find_program_address(&[VaultState::SEED.as_bytes(), &PAYER.to_bytes()], &PROGRAM);
 
     //Initialize the accounts
     let payer_account = Account::new(1 * LAMPORTS_PER_SOL, 0, &system_program);
-    let mystate_account = Account::new(0, 0, &system_program);
+    let VaultState_account = Account::new(0, 0, &system_program);
     let min_balance = mollusk.sysvars.rent.minimum_balance(Rent::size_of());
     let mut rent_account = Account::new(min_balance, Rent::size_of(), &RENT);
     rent_account.data = get_rent_data();
@@ -52,7 +52,7 @@ fn test_initialize_mystate() {
     //Push the accounts in to the instruction_accounts vec!
     let ix_accounts = vec![
         AccountMeta::new(PAYER, true),
-        AccountMeta::new(mystate_pda, false),
+        AccountMeta::new(VaultState_pda, false),
         AccountMeta::new_readonly(RENT, false),
         AccountMeta::new_readonly(system_program, false),
     ];
@@ -75,7 +75,7 @@ fn test_initialize_mystate() {
     // Create tx_accounts vec
     let tx_accounts = &vec![
         (PAYER, payer_account.clone()),
-        (mystate_pda, mystate_account.clone()),
+        (VaultState_pda, VaultState_account.clone()),
         (RENT, rent_account.clone()),
         (system_program, system_account.clone()),
     ];
@@ -85,4 +85,3 @@ fn test_initialize_mystate() {
 
     assert!(init_res.program_result == ProgramResult::Success);
 }
-        
