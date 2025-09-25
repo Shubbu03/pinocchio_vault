@@ -1,12 +1,6 @@
 use pinocchio::{
-    account_info::AccountInfo,
-    instruction::{Seed, Signer},
-    program_error::ProgramError,
-    sysvars::rent::Rent,
-    ProgramResult,
+    account_info::AccountInfo, program_error::ProgramError, sysvars::rent::Rent, ProgramResult,
 };
-
-use pinocchio_system::instructions::Transfer;
 
 use crate::states::{load_acc_unchecked, load_ix_data, DataLen, VaultState};
 
@@ -56,22 +50,19 @@ pub fn withdraw_from_vault(accounts: &[AccountInfo], data: &[u8]) -> ProgramResu
         return Err(ProgramError::InsufficientFunds);
     }
 
-    let bump_bytes = [withdraw_ix_data.bump];
+    // Move lamports directly. Since our program owns `vault` and it carries data,
+    // using a CPI to the system program would fail (system transfer requires empty data).
+    unsafe {
+        let vault_lamports = vault.borrow_mut_lamports_unchecked();
+        let user_lamports = user.borrow_mut_lamports_unchecked();
 
-    let signer_seeds = [
-        Seed::from(VaultState::SEED.as_bytes()),
-        Seed::from(user.key()),
-        Seed::from(&bump_bytes[..]),
-    ];
-
-    let signers = &[Signer::from(&signer_seeds[..])];
-
-    Transfer {
-        from: vault,
-        to: user,
-        lamports: withdraw_ix_data.amount,
+        *vault_lamports = (*vault_lamports)
+            .checked_sub(withdraw_ix_data.amount)
+            .ok_or(ProgramError::InsufficientFunds)?;
+        *user_lamports = (*user_lamports)
+            .checked_add(withdraw_ix_data.amount)
+            .ok_or(ProgramError::InsufficientFunds)?;
     }
-    .invoke_signed(signers)?;
 
     Ok(())
 }

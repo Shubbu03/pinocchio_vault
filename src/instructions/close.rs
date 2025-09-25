@@ -1,12 +1,5 @@
-use pinocchio::{
-    account_info::AccountInfo,
-    instruction::{Seed, Signer},
-    program_error::ProgramError,
-    ProgramResult,
-};
-use pinocchio_system::instructions::Transfer;
-
 use crate::states::{load_acc_unchecked, load_ix_data, DataLen, VaultState};
+use pinocchio::{account_info::AccountInfo, program_error::ProgramError, ProgramResult};
 
 #[repr(C)]
 pub struct Close {
@@ -36,30 +29,17 @@ pub fn close_vault(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
         return Err(ProgramError::InvalidAccountOwner);
     }
 
-    let ix_bump = [close_ix_data.bump];
-
-    let signer_seeds = &[
-        Seed::from(VaultState::SEED.as_bytes()),
-        Seed::from(user.key()),
-        Seed::from(&ix_bump[..]),
-    ];
-
-    let signer = &[Signer::from(&signer_seeds[..])];
-
-    //transfer all remaining amt to user
-    Transfer {
-        from: vault,
-        to: user,
-        lamports: vault.lamports(),
+    // Move all lamports directly; system transfer would reject `from` with data.
+    unsafe {
+        let vault_lamports = vault.borrow_mut_lamports_unchecked();
+        let user_lamports = user.borrow_mut_lamports_unchecked();
+        let amount = *vault_lamports;
+        *vault_lamports = 0;
+        *user_lamports = (*user_lamports)
+            .checked_add(amount)
+            .ok_or(ProgramError::InsufficientFunds)?;
     }
-    .invoke_signed(signer)?;
 
-    //close the vault account
-    // AFTER ALL LAMPORTS IS MOVED OUT OF VAULT , IT BECOMES RENT-INELIGIBLE AND SOLANA RUNTIME WILL GARBAGE COLLECT IT AUTOMATICALLY.
-
-    //BUT FOR PROD, WE CAN ASSIGN THE VAULT TO THE SYSTEM_PROGRAM-
-    // unsafe {
-    //     vault.assign(&solana_program::system_program::ID);
-    // };
+    // After draining lamports, Solana runtime would garbage collect rent-ineligible accounts.
     Ok(())
 }
